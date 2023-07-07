@@ -17,79 +17,44 @@ from scipy.stats import zscore
 import PyEMD
 from PyEMD import EMD, EEMD, CEEMDAN
 import scipy
+from vmdpy import VMD
 
 
 # In[2]:
 
 
-def gaussian_wave(mu, sigma, x):
-    return (1 / (sigma * np.sqrt(2 * np.pi))) * np.exp(-0.5 * ((x - mu) / sigma)**2)
+def fEMD(y_sum, y_truth):
+    emd = EMD()
+    imfs = emd(y_sum)
 
+    # find the IMF with the largest correlation
+    correlations = []
+    for i, imf in enumerate(imfs):
+        correlation = np.corrcoef(imf, y_truth)[0, 1]
+        correlations.append(correlation)
 
-# Wave1
-mu1 = 1  # mean (time point)
-sigma1 = 1  # sd (duration=2*sigma ms)
-
-# Wave2 
-mu2 = 0.6  # mean (time point)
-sigma2 = 0.1  # sd (duration=2*sigma ms)
-
-# Wave3
-mu3 = 1.4  # mean (time point)
-sigma3 = 0.1  # sd (duration=2*sigma ms)
-
-
-
-x = np.linspace(0, 2, num=500)  
-
-y1 = gaussian_wave(mu1, sigma1, x)
-y2 = gaussian_wave(mu2, sigma2, x)/80
-y3 = gaussian_wave(mu3, sigma3, x)/80
-
-
-y_sum = y1 + y2 + y3
-y_truth= y2 + y3
-
-rescale_factor = 1/y_sum.std()
-
-y1 *= rescale_factor
-y2 *= rescale_factor
-y3 *= rescale_factor
-y_sum *= rescale_factor
-y_truth *= rescale_factor
-
-y1 = y1 - 4
-y_sum = y1 + y2 + y3
-
-#plotting
-
-plt.plot(x, y_sum, label='The Sum')
-plt.title("Gaussian Waves")
-plt.xlabel('Time(s)')
-plt.ylabel('Power(mV)')
-
-plt.plot(x,y_truth,label='Ground Truth')
-
-plt.plot(x,y1,label='Slow Drift')
-
-plt.legend()
-plt.show()
-
-
-# In[ ]:
-
-
+    # index of the IMF with the largest correlation
+    max_correlation_index = np.argmax(correlations)
+    return correlations[max_correlation_index]
 
 
 
 # In[3]:
 
 
-#EMD
+def fEEMD(y_sum, y_truth):
+    eemd = EEMD()
+    imfs = eemd(y_sum)
 
+    # find the IMF with the largest correlation
+    correlations = []
+    for i, imf in enumerate(imfs):
+        correlation = np.corrcoef(imf, y_truth)[0, 1]
+        correlations.append(correlation)
 
-# In[ ]:
-
+    # index of the IMF with the largest correlation
+    max_correlation_index = np.argmax(correlations)
+    return correlations[max_correlation_index]
 
 
 
@@ -97,238 +62,378 @@ plt.show()
 # In[4]:
 
 
-emd = EMD()
-imfs = emd(y_sum)
+def fCEEMDAN(y_sum, y_truth):
+    ceemdan = CEEMDAN()
+    imfs = ceemdan(y_sum)
 
-# find the IMF with the largest correlation
-correlations = []
-for i, imf in enumerate(imfs):
-    correlation = np.corrcoef(imf, y_truth)[0, 1]
-    correlations.append(correlation)
+    # find the IMF with the largest correlation
+    correlations = []
+    for i, imf in enumerate(imfs):
+        correlation = np.corrcoef(imf, y_truth)[0, 1]
+        correlations.append(correlation)
 
-# index of the IMF with the largest correlation
-max_correlation_index = np.argmax(correlations)
-
-print("IMF with the largest correlation is imfs[",max_correlation_index+1,"]")
-
-# plot the IMFs
-plt.figure(figsize=(16, 10))
-for i, imf in enumerate(imfs):
-    plt.subplot(len(imfs), 1, i+1)
-    plt.plot(x, imf, label='IMF {}'.format(i+1))
-    plt.xlabel('Time')
-    plt.ylabel('Amplitude')
-    plt.title('Intrinsic Mode Function (IMF {})'.format(i+1))
-    plt.legend()
-
-    # correlation coefficient
-    correlation = correlations[i]
-    text = 'Correlation: {:.2f}'.format(correlation)
-
-    # text annotation
-    plt.text(0.1, 0.9, text, size=12, color='blue', ha='right', va='top', transform=plt.gca().transAxes)
-
-plt.tight_layout()
-plt.show()
+    # index of the IMF with the largest correlation
+    max_correlation_index = np.argmax(correlations)
+    return correlations[max_correlation_index]
 
 
 
 # In[5]:
 
 
-eemd = EEMD()
-imfs = eemd(y_sum)
+def fWMD(y_sum, y_truth):
+   #. some sample parameters for VMD  
+   alpha = 5000      # moderate bandwidth constraint  
+   tau = 0           # noise-tolerance (no strict fidelity enforcement)  
+   K = 7              # number of modes  
+   DC = 0             # no DC part imposed  
+   init = 1           # initialize omegas uniformly  
+   tol = 1e-7
 
-# find the IMF with the largest correlation
-correlations = []
-for i, imf in enumerate(imfs):
-    correlation = np.corrcoef(imf, y_truth)[0, 1]
-    correlations.append(correlation)
-
-# index of the IMF with the largest correlation
-max_correlation_index = np.argmax(correlations)
-
-print("IMF with the largest correlation is imfs[",max_correlation_index+1,"]")
-
-# plot the IMFs
-plt.figure(figsize=(16, 10))
-for i, imf in enumerate(imfs):
-    plt.subplot(len(imfs), 1, i+1)
-    plt.plot(x, imf, label='IMF {}'.format(i+1))
-    plt.xlabel('Time')
-    plt.ylabel('Amplitude')
-    plt.title('Intrinsic Mode Function (IMF {})'.format(i+1))
-    plt.legend()
-
-    # correlation coefficient
-    correlation = correlations[i]
-    text = 'Correlation: {:.2f}'.format(correlation)
-
-    # text annotation
-    plt.text(0.1, 0.9, text, size=12, color='blue', ha='right', va='top', transform=plt.gca().transAxes)
-
-plt.tight_layout()
-plt.show()
+   u, u_hat, omega = VMD(y_sum, alpha, tau, K, DC, init, tol)
 
 
-# In[6]:
+   # find the IMF with the largest correlation
+   correlations = []
+   for i, imf in enumerate(u):
+       correlation = np.corrcoef(u[i], y_truth)[0, 1]
+       correlations.append(correlation)
 
-
-#CEEMDAN 
-
-
-# In[7]:
-
-
-ceemdan = CEEMDAN()
-imfs = ceemdan(y_sum)
-
-# find the IMF with the largest correlation
-correlations = []
-for i, imf in enumerate(imfs):
-    correlation = np.corrcoef(imf, y_truth)[0, 1]
-    correlations.append(correlation)
-
-# index of the IMF with the largest correlation
-max_correlation_index = np.argmax(correlations)
-print(correlations[max_correlation_index])
-
-print("IMF with the largest correlation is imfs[",max_correlation_index+1,"]")
-
-# plot the IMFs
-plt.figure(figsize=(16, 10))
-for i, imf in enumerate(imfs):
-    plt.subplot(len(imfs), 1, i+1)
-    plt.plot(x, imf, label='IMF {}'.format(i+1))
-    plt.xlabel('Time')
-    plt.ylabel('Amplitude')
-    plt.title('Intrinsic Mode Function (IMF {})'.format(i+1))
-    plt.legend()
-
-    # correlation coefficient
-    correlation = correlations[i]
-    text = 'Correlation: {:.2f}'.format(correlation)
-
-    # text annotation
-    plt.text(0.1, 0.9, text, size=12, color='blue', ha='right', va='top', transform=plt.gca().transAxes)
-
-plt.tight_layout()
-plt.show()
-
-
-# In[ ]:
-
-
-
-
-
-# In[8]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-#variational mode decomposition
-
-
-# In[10]:
-
-
-from vmdpy import VMD
-
-
-# In[39]:
-
-
-#. some sample parameters for VMD  
-alpha = 5000      # moderate bandwidth constraint  
-tau = 0           # noise-tolerance (no strict fidelity enforcement)  
-K = 4              # number of modes  
-DC = 0             # no DC part imposed  
-init = 1           # initialize omegas uniformly  
-tol = 1e-7
-
-
-# In[40]:
-
-
-u, u_hat, omega = VMD(y_sum, alpha, tau, K, DC, init, tol)
-
-
-# In[ ]:
-
-
-for i in range(K):   
-    plt.plot(u[i])
-    plt.figure()
-    
+   # index of the IMF with the largest correlation
+   max_correlation_index = np.argmax(correlations)
+   return correlations[max_correlation_index]
 
 
 # 
 # The VMD function gives 3 output variables. u contains the decomposed signals, omega contains the frequency information. u_hat is an array that contains complex values which is used in computing the omega.
 # 
 
-# In[54]:
-
-
-# find the IMF with the largest correlation
-correlations = []
-for i, imf in enumerate(u):
-    correlation = np.corrcoef(u[i], y_truth)[0, 1]
-    correlations.append(correlation)
-
-# index of the IMF with the largest correlation
-max_correlation_index = np.argmax(correlations)
-print(correlations[max_correlation_index])
-
-print("WMD with the largest correlation is wmd[", max_correlation_index+1, "]")
-
-# plot the IMFs
-plt.figure(figsize=(16, 10))
-
-for i in range(K):   
-    plt.figure()
-    plt.plot(x, u[i])
-    plt.xlabel('Time')
-    plt.ylabel('Amplitude')
-    plt.title('WMD (WMD {})'.format(i+1))
-
-    # correlation coefficient
-    correlation = correlations[i]
-    text = 'Correlation: {:.2f}'.format(correlation)
-
-    # text annotation
-    plt.text(0.2, 0.9, text, size=9, color='blue', ha='right', va='top', transform=plt.gca().transAxes)
-
-plt.tight_layout()
-plt.show()
-
-
-# In[ ]:
+# In[6]:
 
 
 #Idea: Compare best performed IMF's corr values of EMD-EEMD-CEEMDAN to see which one is the best
 
 
-# In[ ]:
+# In[7]:
+
+
+def gaussian_wave(mu, sigma, x):
+    return (1 / (sigma * np.sqrt(2 * np.pi))) * np.exp(-0.5 * ((x - mu) / sigma)**2)
+
+
+# In[8]:
+
+
+def Parameters(mu1,sigma1,mu2,sigma2,mu3,sigma3):
+
+    x = np.linspace(0, 2, num=500)  
+
+    y1 = gaussian_wave(mu1, sigma1, x)
+    y2 = gaussian_wave(mu2, sigma2, x)/80
+    y3 = gaussian_wave(mu3, sigma3, x)/80
+
+
+    y_sum = y1 + y2 + y3
+    y_truth= y2 + y3
+
+    rescale_factor = 1/y_sum.std()
+
+    y1 *= rescale_factor
+    y2 *= rescale_factor
+    y3 *= rescale_factor
+    y_sum *= rescale_factor
+    y_truth *= rescale_factor
+
+    y1 = y1
+    y_sum = y1 + y2 + y3
+    
+    #plotting
+
+    plt.plot(x, y_sum, label='The Sum')
+    plt.title("Gaussian Waves")
+    plt.xlabel('Time(s)')
+    plt.ylabel('Power(mV)')
+
+    plt.plot(x,y_truth,label='Ground Truth')
+
+    plt.plot(x,y1,label='Slow Drift')
+
+    plt.legend()
+    plt.show()
+    
+    
+    return y_sum, y_truth
+
+
+# In[13]:
+
+
+import numpy as np
+
+# Define the parameter ranges
+mu1_range = [0.5, 1.5]
+sigma1_range = [0.5, 1.5]
+mu2_range = [0.4, 0.8]
+sigma2_range = [0.05, 0.15]
+mu3_range = [1.2, 1.6]
+sigma3_range = [0.05, 0.15]
+
+# Set the number of random parameter combinations to try
+num_combinations = 20
+
+# Perform the parameter sweep
+results = []
+for _ in range(num_combinations):
+    # Randomly sample parameter values within the specified ranges
+    mu1 = np.random.uniform(*mu1_range)
+    sigma1 = np.random.uniform(*sigma1_range)
+    mu2 = np.random.uniform(*mu2_range)
+    sigma2 = np.random.uniform(*sigma2_range)
+    mu3 = np.random.uniform(*mu3_range)
+    sigma3 = np.random.uniform(*sigma3_range)
+    y_sum,y_truth = Parameters(mu1,sigma1,mu2,sigma2,mu3,sigma3)
+    
+    fEMD(y_sum,y_truth)
+    fEEMD(y_sum,y_truth)
+    fCEEMDAN(y_sum,y_truth)
+    fWMD(y_sum,y_truth)
+
+
+# In[11]:
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Define the parameter ranges
+mu1_range = [0.5, 1.5]
+sigma1_range = [0.5, 1.5]
+mu2_range = [0.4, 0.8]
+sigma2_range = [0.05, 0.15]
+mu3_range = [1.2, 1.6]
+sigma3_range = [0.05, 0.15]
+
+# Set the number of random parameter combinations to try
+num_combinations = 10
+# Perform the parameter sweep
+results_emd = []
+results_eemd = []
+results_ceemdan = []
+results_wmd = []
+# Perform the parameter sweep
+results = []
+for _ in range(num_combinations):
+    # Randomly sample parameter values within the specified ranges
+    mu1 = np.random.uniform(*mu1_range)
+    sigma1 = np.random.uniform(*sigma1_range)
+    mu2 = np.random.uniform(*mu2_range)
+    sigma2 = np.random.uniform(*sigma2_range)
+    mu3 = np.random.uniform(*mu3_range)
+    sigma3 = np.random.uniform(*sigma3_range)
+    y_sum, y_truth = Parameters(mu1, sigma1, mu2, sigma2, mu3, sigma3)
+    
+    result_emd = fEMD(y_sum, y_truth)
+    result_eemd = fEEMD(y_sum, y_truth)
+    result_ceemdan = fCEEMDAN(y_sum, y_truth)
+    result_wmd = fWMD(y_sum, y_truth)
+
+    print("EMD:", result_emd)
+    print("EEMD:" ,result_eemd)
+    print("CEEMDAN:",result_ceemdan)
+    print("WMD: " ,result_wmd)
+    
+    results_emd.append(result_emd)
+    results_eemd.append(result_eemd)
+    results_ceemdan.append(result_ceemdan)
+    results_wmd.append(result_wmd)
+
+# Plot the results
+x = range(1, num_combinations + 1)
+plt.figure(figsize=(10,6))
+plt.plot(x, results_emd, marker='o', label='EMD')
+plt.plot(x, results_eemd, marker='o', label='EEMD')
+plt.plot(x, results_ceemdan, marker='o', label='CEEMDAN')
+plt.plot(x, results_wmd, marker='o', label='WMD')
+
+plt.xlabel('Sample')
+plt.ylabel('Result')
+plt.legend()
+plt.grid(True)
+plt.show()
 
 
 
 
-
-# In[ ]:
-
+# In[9]:
 
 
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Define the parameter ranges
+mu1_range = [0.5, 1.5]
+sigma1_range = [0.5, 1.5]
+mu2_range = [0.4, 0.8]
+sigma2_range = [0.05, 0.15]
+mu3_range = [1.2, 1.6]
+sigma3_range = [0.05, 0.15]
+
+# Set the number of random parameter combinations to try
+num_combinations = 100
+# Perform the parameter sweep
+results_emd = []
+results_eemd = []
+results_ceemdan = []
+results_wmd = []
+# Perform the parameter sweep
+results = []
+for _ in range(num_combinations):
+    # Randomly sample parameter values within the specified ranges
+    mu1 = np.random.uniform(*mu1_range)
+    sigma1 = np.random.uniform(*sigma1_range)
+    mu2 = np.random.uniform(*mu2_range)
+    sigma2 = np.random.uniform(*sigma2_range)
+    mu3 = np.random.uniform(*mu3_range)
+    sigma3 = np.random.uniform(*sigma3_range)
+    y_sum, y_truth = Parameters(mu1, sigma1, mu2, sigma2, mu3, sigma3)
+    
+    result_emd = fEMD(y_sum, y_truth)
+    result_eemd = fEEMD(y_sum, y_truth)
+    result_ceemdan = fCEEMDAN(y_sum, y_truth)
+    result_wmd = fWMD(y_sum, y_truth)
+
+    print("EMD:", result_emd)
+    print("EEMD:" ,result_eemd)
+    print("CEEMDAN:",result_ceemdan)
+    print("WMD: " ,result_wmd)
+    
+    results_emd.append(result_emd)
+    results_eemd.append(result_eemd)
+    results_ceemdan.append(result_ceemdan)
+    results_wmd.append(result_wmd)
+
+# Plot the results
+x = range(1, num_combinations + 1)
+plt.figure(figsize=(10,6))
+plt.plot(x, results_emd, marker='o', label='EMD')
+plt.plot(x, results_eemd, marker='o', label='EEMD')
+plt.plot(x, results_ceemdan, marker='o', label='CEEMDAN')
+plt.plot(x, results_wmd, marker='o', label='WMD')
+
+plt.xlabel('Sample')
+plt.ylabel('Result')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+
+
+
+# In[14]:
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Define the parameter ranges
+mu1_range = [0.5, 1.5]
+sigma1_range = [0.5, 1.5]
+mu2_range = [0.4, 0.8]
+sigma2_range = [0.05, 0.15]
+mu3_range = [1.2, 1.6]
+sigma3_range = [0.05, 0.15]
+
+# Set the number of random parameter combinations to try
+num_combinations = 10
+# Perform the parameter sweep
+results_emd = []
+results_eemd = []
+results_ceemdan = []
+results_wmd = []
+
+results_mu1 = []
+results_sigma1 = []
+results_mu2 = []
+results_sigma2 = []
+results_mu3 = []
+results_sigma3 = []
+
+# Perform the parameter sweep
+results = []
+for _ in range(num_combinations):
+    # Randomly sample parameter values within the specified ranges
+    mu1 = np.random.uniform(*mu1_range)
+    sigma1 = np.random.uniform(*sigma1_range)
+    mu2 = np.random.uniform(*mu2_range)
+    sigma2 = np.random.uniform(*sigma2_range)
+    mu3 = np.random.uniform(*mu3_range)
+    sigma3 = np.random.uniform(*sigma3_range)
+    
+    
+    
+    y_sum, y_truth = Parameters(mu1, sigma1, mu2, sigma2, mu3, sigma3)
+    
+    result_emd = fEMD(y_sum, y_truth)
+    result_eemd = fEEMD(y_sum, y_truth)
+    result_ceemdan = fCEEMDAN(y_sum, y_truth)
+    result_wmd = fWMD(y_sum, y_truth)
+
+    print("EMD:", result_emd)
+    print("EEMD:" ,result_eemd)
+    print("CEEMDAN:",result_ceemdan)
+    print("WMD: " ,result_wmd)
+    
+    results_emd.append(result_emd)
+    results_eemd.append(result_eemd)
+    results_ceemdan.append(result_ceemdan)
+    results_wmd.append(result_wmd)
+    
+    results_mu1.append(mu1)
+    results_sigma1.append(sigma1)
+    results_mu2.append(mu2)
+    results_sigma2.append(sigma2)
+    results_mu3.append(mu3)
+    results_sigma3.append(sigma3)
+
+# Plot the results
+x = range(1, num_combinations + 1)
+plt.figure(figsize=(10,6))
+plt.plot(x, results_emd, marker='o', label='EMD')
+plt.plot(x, results_eemd, marker='o', label='EEMD')
+plt.plot(x, results_ceemdan, marker='o', label='CEEMDAN')
+plt.plot(x, results_wmd, marker='o', label='WMD')
+
+plt.xlabel('Sample')
+plt.ylabel('Result')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+
+plt.figure(figsize=(10,6))
+
+plt.plot(x, results_mu1, marker='o', label='mean of slow drift')
+plt.plot(x, results_sigma1, marker='o', label='sigma of slow drift')
+plt.plot(x, results_mu2, marker='o', label='mean of fast drift-1')
+plt.plot(x, results_sigma2, marker='o', label='sigma of fast drift-1')
+plt.plot(x, results_mu3, marker='o', label='mean of fast drift-2')
+plt.plot(x, results_sigma3, marker='o', label='sigma of fast drift-2')
+
+plt.xlabel('Sample')
+plt.ylabel('Result')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+
+
+# In[11]:
+
+
+print(np.mean(results_emd))  
+print(np.mean(results_eemd)) 
+print(np.mean(results_ceemdan)) 
+print(np.mean(results_wmd)) 
 
 
 # In[ ]:
