@@ -20,6 +20,8 @@ from PyEMD import EMD, EEMD, CEEMDAN
 import scipy
 from vmdpy import VMD
 import  ewtpy
+import peakutils
+from scipy.signal import find_peaks
 
 
 # In[2]:
@@ -30,14 +32,16 @@ def fEMD(y_sum, y_truth):
     imfs = emd(y_sum)
 
     # find the IMF with the largest correlation
-    correlations = []
+    distances = []
     for i, imf in enumerate(imfs):
-        correlation = np.corrcoef(imf, y_truth)[0, 1]
-        correlations.append(correlation)
+        peaks_imf, _ = find_peaks(imf)
+        peaks_truth, _ = find_peaks(y_truth)
+        distance = calculate_similarity(peaks_imf, peaks_truth)
+        distances.append(distance)
 
-    # index of the IMF with the largest correlation
-    max_correlation_index = np.argmax(correlations)
-    return correlations[max_correlation_index]
+    # index of the IMF with the minimal distance
+    min_distance_index = np.argmin(distances)
+    return distances[min_distance_index]
 
 
 # In[3]:
@@ -48,14 +52,16 @@ def fEEMD(y_sum, y_truth):
     imfs = eemd(y_sum)
 
     # find the IMF with the largest correlation
-    correlations = []
+    distances = []
     for i, imf in enumerate(imfs):
-        correlation = np.corrcoef(imf, y_truth)[0, 1]
-        correlations.append(correlation)
+        peaks_imf, _ = find_peaks(imf)
+        peaks_truth, _ = find_peaks(y_truth)
+        distance = calculate_similarity(peaks_imf, peaks_truth)
+        distances.append(distance)
 
-    # index of the IMF with the largest correlation
-    max_correlation_index = np.argmax(correlations)
-    return correlations[max_correlation_index]
+    # index of the IMF with the minimal distance
+    min_distance_index = np.argmin(distances)
+    return distances[min_distance_index]
 
 
 # In[4]:
@@ -64,16 +70,18 @@ def fEEMD(y_sum, y_truth):
 def fCEEMDAN(y_sum, y_truth):
     ceemdan = CEEMDAN()
     imfs = ceemdan(y_sum)
-
+    
     # find the IMF with the largest correlation
-    correlations = []
+    distances = []
     for i, imf in enumerate(imfs):
-        correlation = np.corrcoef(imf, y_truth)[0, 1]
-        correlations.append(correlation)
+        peaks_imf, _ = find_peaks(imf)
+        peaks_truth, _ = find_peaks(y_truth)
+        distance = calculate_similarity(peaks_imf, peaks_truth)
+        distances.append(distance)
 
-    # index of the IMF with the largest correlation
-    max_correlation_index = np.argmax(correlations)
-    return correlations[max_correlation_index]
+    # index of the IMF with the minimal distance
+    min_distance_index = np.argmin(distances)
+    return distances[min_distance_index]
 
 
 # In[5]:
@@ -92,14 +100,16 @@ def fWMD(y_sum, y_truth):
 
 
    # find the IMF with the largest correlation
-   correlations = []
+   distances = []
    for i in range(K):
-       correlation = np.corrcoef(u[i], y_truth)[0, 1]
-       correlations.append(correlation)
+       peaks_imf, _ = find_peaks(u[i])
+       peaks_truth, _ = find_peaks(y_truth)
+       distance = calculate_similarity(peaks_imf, peaks_truth)
+       distances.append(distance)
 
-   # index of the IMF with the largest correlation
-   max_correlation_index = np.argmax(correlations)
-   return correlations[max_correlation_index]
+   # index of the IMF with the minimal distance
+   min_distance_index = np.argmin(distances)
+   return distances[min_distance_index]
 
 
 # In[6]:
@@ -112,14 +122,16 @@ def fEWT(y_sum, y_truth):
     
     
     # find the IMF with the largest correlation
-    correlations = []
+    distances = []
     for i in range(ewt.shape[1]):
-        correlation = np.corrcoef(ewt[:,i], y_truth)[0, 1]
-        correlations.append(correlation)
+        peaks_imf, _ = find_peaks(ewt[:,i])
+        peaks_truth, _ = find_peaks(y_truth)
+        distance = calculate_similarity(peaks_imf, peaks_truth)
+        distances.append(distance)
 
-    # index of the IMF with the largest correlation
-    max_correlation_index = np.argmax(correlations)
-    return correlations[max_correlation_index]  
+    # index of the IMF with the minimal distance
+    min_distance_index = np.argmin(distances)
+    return distances[min_distance_index]
 
 
 # 
@@ -137,11 +149,31 @@ def fEWT(y_sum, y_truth):
 # In[8]:
 
 
+# Function to calculate minimum distance for each peak in first dataset to any peak in second dataset
+def calculate_distances(peaks1, peaks2):
+    min_distances = [np.min(np.abs(peaks1[i] - peaks2)) for i in range(len(peaks1))]
+    return min_distances
+
+# Function to calculate average minimum distance as a measure of similarity
+def calculate_similarity(peaks1, peaks2):
+    min_distances = calculate_distances(peaks1, peaks2)
+    if len(min_distances) > 0:
+        average_min_distance = np.mean(min_distances)
+    else:
+        average_min_distance = np.inf  # if there are no peaks, set similarity to infinity
+    return average_min_distance
+
+
+
+
+# In[9]:
+
+
 def gaussian_wave(mu, sigma, x):
     return (1 / (sigma * np.sqrt(2 * np.pi))) * np.exp(-0.5 * ((x - mu) / sigma)**2)
 
 
-# In[9]:
+# In[10]:
 
 
 def Parameters(mu1,sigma1,mu2,sigma2,mu3,sigma3):
@@ -185,7 +217,7 @@ def Parameters(mu1,sigma1,mu2,sigma2,mu3,sigma3):
     return y_sum, y_truth
 
 
-# In[10]:
+# In[11]:
 
 
 # Define the parameter ranges
@@ -197,7 +229,7 @@ mu3_range = [1.2, 1.6]
 sigma3_range = [0.05, 0.15]
 
 # Set the number of random parameter combinations to try
-num_combinations = 100
+num_combinations = 1000
 # Perform the parameter sweep
 results_emd = []
 results_eemd = []
@@ -251,7 +283,7 @@ for _ in range(num_combinations):
     results_sigma3.append(sigma3)
 
 
-# In[68]:
+# In[12]:
 
 
 # Plot the results
@@ -286,7 +318,7 @@ plt.grid(True)
 plt.show()
 
 
-# In[12]:
+# In[13]:
 
 
 print(np.mean(results_emd))  
@@ -296,7 +328,7 @@ print(np.mean(results_wmd))
 print(np.mean(results_ewt)) 
 
 
-# In[35]:
+# In[14]:
 
 
 from mpl_toolkits.mplot3d import Axes3D
@@ -317,13 +349,13 @@ for i, results in enumerate(results_all):
 
 ax.set_xlabel('Distance between fast waves')
 ax.set_ylabel('Flatness of fast waves')
-ax.set_zlabel('Performance')
+ax.set_zlabel('Peak discrepancy')
 plt.legend()
 plt.grid(True)
 plt.show()
 
 
-# In[71]:
+# In[18]:
 
 
 # Assuming your results are stored in lists.
@@ -340,25 +372,25 @@ fig, axs = plt.subplots(len(results_all), 2, figsize=(20, 30))
 
 for i, results in enumerate(results_all):
     results = np.ravel(results)  # Flatten results to a 1D array
-    h1 = axs[i][0].hist2d(x, results, bins=7, cmap='viridis')
-    h2 = axs[i][1].hist2d(y, results, bins=7, cmap='viridis')
+    h1 = axs[i][0].hist2d(x, results, bins=10, cmap='viridis')
+    h2 = axs[i][1].hist2d(y, results, bins=10, cmap='viridis')
     
     fig.colorbar(h1[3], ax=axs[i][0])
     fig.colorbar(h2[3], ax=axs[i][1])
     
     axs[i][0].set_xlabel('Distance of fast waves')
-    axs[i][0].set_ylabel('Performance')
+    axs[i][0].set_ylabel('Peak discrepancy ')
     axs[i][0].set_title(labels_all[i])
 
     axs[i][1].set_xlabel('Flatness of fast waves')
-    axs[i][1].set_ylabel('Performance')
+    axs[i][1].set_ylabel('Peak discrepancy')
     axs[i][1].set_title(labels_all[i])
 
 plt.tight_layout()
 plt.show()
 
 
-# In[23]:
+# In[16]:
 
 
 results_all = [results_emd, results_eemd, results_ceemdan, results_wmd, results_ewt]
@@ -375,14 +407,13 @@ for i, results in enumerate(results_all):
 
 ax.set_xlabel('Mean of the Slow Drift')
 ax.set_ylabel('Flatness of Slow Drift')
-ax.set_zlabel('Performance')
-ax.set_title('Performance of Signal Processing Methods')
+ax.set_zlabel('Peak discrepancy')
 plt.legend()
 plt.grid(True)
 plt.show()
 
 
-# In[73]:
+# In[25]:
 
 
 # Assuming your results are stored in lists.
@@ -396,48 +427,45 @@ fig, axs = plt.subplots(len(results_all), 2, figsize=(20, 30))
 
 for i, results in enumerate(results_all):
     results = np.ravel(results)  # Flatten results to a 1D array
-    h1 = axs[i][0].hist2d(x, results, bins=7, cmap='viridis')
-    h2 = axs[i][1].hist2d(y, results, bins=7, cmap='viridis')
+    h1 = axs[i][0].hist2d(x, results, bins=10, cmap='viridis')
+    h2 = axs[i][1].hist2d(y, results, bins=10, cmap='viridis')
     
     fig.colorbar(h1[3], ax=axs[i][0])
     fig.colorbar(h2[3], ax=axs[i][1])
     
     axs[i][0].set_xlabel('Mean of the slow drift')
-    axs[i][0].set_ylabel('Performance')
+    axs[i][0].set_ylabel('Peak discrepancy')
     axs[i][0].set_title(labels_all[i])
 
     axs[i][1].set_xlabel('Flatness of the slow drift')
-    axs[i][1].set_ylabel('Performance')
+    axs[i][1].set_ylabel('Peak discrepancy')
     axs[i][1].set_title(labels_all[i])
 
 plt.tight_layout()
 plt.show()
 
 
-# In[ ]:
+# In[28]:
 
 
+from sklearn.decomposition import PCA
 
+results = np.array([results_emd, results_eemd, results_ceemdan, results_wmd, results_ewt])
 
+pca = PCA(n_components=2)
+results_pca = pca.fit_transform(results)
 
-# In[79]:
+plt.figure(figsize=(5, 3))
+plt.scatter(results_pca[:, 0], results_pca[:, 1], marker='o', c=range(len(results)), cmap='viridis')
 
+for i, label in enumerate(['EMD', 'EEMD', 'CEEMDAN', 'WMD', 'EWT']):
+    plt.annotate(label, (results_pca[i, 0], results_pca[i, 1]), textcoords="offset points", xytext=(0,10), ha='center')
 
-import matplotlib
+plt.xlabel('First Principal Component')
+plt.ylabel('Second Principal Component')
 
-
-# In[85]:
-
-
-_, _ = matplotlib.pyplot.psd(y_sum)
-_, _ = matplotlib.pyplot.psd(y_truth)
-matplotlib.pyplot.show()
-
-
-# In[ ]:
-
-
-
+plt.grid(True)
+plt.show()
 
 
 # In[ ]:
